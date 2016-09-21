@@ -14,13 +14,7 @@ unzip-strip() (
 )
 
 sudo systemctl stop pivideo.service
-sudo systemctl disable pivideo.service
-
 sudo systemctl stop ngrok.service
-sudo systemctl disable ngrok.service
-
-sudo rm /etc/systemd/system/pivideo.service
-sudo rm /etc/systemd/system/ngrok.service
 
 sudo rm pivideo -r
 sudo rm systemd -r
@@ -38,14 +32,7 @@ pip install -r requirements.txt
 sudo mkdir -p /file_cache
 sudo chmod 777 /file_cache
 
-#set up ngrok tunnel services for remote access and management
-sudo cp systemd/ngrok.service /etc/systemd/system/ngrok.service
-sudo systemctl enable /etc/systemd/system/ngrok.service
 sudo systemctl start ngrok.service
-
-#set up services to keep video village pi API running after restarts, etc
-sudo cp systemd/pivideo.service /etc/systemd/system/pivideo.service
-sudo systemctl enable /etc/systemd/system/pivideo.service
 sudo systemctl start pivideo.service
 
 deactivate
