@@ -10,15 +10,18 @@ import threading
 import time
 from urlparse import urlparse
 import logging
-from pivideo.networking import get_hardware_address
+from pivideo.networking import get_hardware_address, get_ip_address
 
 logging.basicConfig(format='%(asctime)s	%(levelname)s:%(name)s:%(message)s', level=logging.INFO)
+
+version = 'v0.5'
 
 play_list = None
 photo_overlay = None
 encoder = None
 transcode_queue = collections.deque()
 PI_HARDWARE_ADDRESS = get_hardware_address('eth0')
+PI_IP_ADDRESS = get_ip_address('eth0')
 
 from pivideo import omx
 from pivideo.tasks import setup_core_tasks, registration_task, report_pi_status_task, fetch_show_schedule_task
@@ -106,6 +109,61 @@ def heartbeat():
 heartbeat_thread = threading.Thread(target=heartbeat)
 heartbeat_thread.daemon = True
 heartbeat_thread.start()
+
+
+def bytes2human(n):
+    symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+    prefix = {}
+    for i, s in enumerate(symbols):
+        prefix[s] = 1 << (i+1)*10
+    for s in reversed(symbols):
+        if n >= prefix[s]:
+            value = float(n) / prefix[s]
+            return '{0:.1f}{1}'.format(value, s)
+    return "{0}B".format(n)
+
+
+def file_cache_size():
+    """
+        Reports size of FILE_CACHE directory
+    """
+    try:
+        cached_byte_count = 0
+        for cached_file_name in os.listdir(FILE_CACHE):
+            cached_file_path = os.path.join(FILE_CACHE, cached_file_name)
+            if os.path.isfile(cached_file_path):
+                cached_byte_count += os.path.getsize(cached_file_path)
+
+        return bytes2human(cached_byte_count)
+    except:
+        logger.exception('Unable to determine file cache size')
+        return 'unknown'
+
+
+def disk_usage(path="/"):
+    """
+        Gather disk usage information for the specified path
+    """
+    human_available = 'unknown'
+    human_capacity = 'unknown'
+    human_used = 'unknown'
+
+    try:
+        disk = os.statvfs(path)
+        capacity = disk.f_bsize * disk.f_blocks
+        available = disk.f_bsize * disk.f_bavail
+        used = disk.f_bsize * (disk.f_blocks - disk.f_bavail)
+        human_available = bytes2human(available)
+        human_capacity = bytes2human(capacity)
+        human_used = bytes2human(used)
+    except:
+        logger.exception('Unable to gather disk usage information')
+    finally:
+        return {
+            'available': human_available,
+            'capacity': human_capacity,
+            'used': human_used
+        }
 
 
 def shutdown_handler():

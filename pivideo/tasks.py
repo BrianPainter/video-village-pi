@@ -5,6 +5,7 @@ import logging
 import glob
 import requests
 import schedule
+import time
 from pivideo import play_list
 from pivideo import omx
 from pivideo.projector import Projector
@@ -20,7 +21,9 @@ def current_status():
         Construct status information dictionary suitable for use
         with status reporting / status API
     """
-    from pivideo import play_list, photo_overlay, encoder, transcode_queue, PI_HARDWARE_ADDRESS, cpu_temp
+    from pivideo import (play_list, photo_overlay, encoder, transcode_queue,
+                         PI_HARDWARE_ADDRESS, cpu_temp, PI_IP_ADDRESS, version,
+                         disk_usage, file_cache_size)
 
     encoder_status = {
         'active': encoder.is_active() if encoder else False,
@@ -53,6 +56,9 @@ def current_status():
     try:
         with Projector() as p:
             projector_status['on'] = p.is_on()
+            if projector_status['on']:
+                projector_status['position'] = p.position_status()
+                projector_status['input_source'] = p.input_source()
             projector_status['connected'] = True
     except:
         logger.exception("Unable to determine current projector status.  Is it connected?")
@@ -69,8 +75,12 @@ def current_status():
     except:
         logger.exception('Unable to determine ngrok tunnel information')
 
+    sd_card = disk_usage()
+    sd_card['file_cache'] = file_cache_size()
+
     return {
         'hardware_address': PI_HARDWARE_ADDRESS,
+        'ip_address': PI_IP_ADDRESS,
         'file_cache': glob.glob('/file_cache/*'),
         'scheduled_jobs': scheduled_jobs,
         'encoder': encoder_status,
@@ -78,7 +88,9 @@ def current_status():
         'overlay': overlay_status,
         'projector': projector_status,
         'tunnels': tunnel_info,
-        'cpu_temp': cpu_temp.temperature if cpu_temp else None
+        'cpu_temp': cpu_temp.temperature if cpu_temp else None,
+        'version': version,
+        'sd_card': sd_card
     }
 
 
@@ -120,9 +132,13 @@ def pre_show_task():
         scheduled_show_active = True
         with Projector() as projector:
             if projector.power_on():
+                time.sleep(5)
                 projector.reset_settings()
+                time.sleep(5)
                 projector.rear_table_position()
+                time.sleep(3)
                 projector.input_source_hdmi()
+                time.sleep(3)
 
         report_pi_status_task()
     except:
